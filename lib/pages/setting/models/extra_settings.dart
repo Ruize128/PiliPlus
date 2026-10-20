@@ -19,6 +19,7 @@ import 'package:PiliPlus/models/common/dynamic/dynamics_type.dart';
 import 'package:PiliPlus/models/common/member/tab_type.dart';
 import 'package:PiliPlus/models/common/reply/reply_sort_type.dart';
 import 'package:PiliPlus/models/common/sponsor_block/skip_type.dart';
+import 'package:PiliPlus/models/common/frame_interpolation_type.dart';
 import 'package:PiliPlus/models/common/super_resolution_type.dart';
 import 'package:PiliPlus/models/dynamics/result.dart'
     show DynamicsDataModel, ItemModulesModel;
@@ -302,6 +303,14 @@ List<SettingsModel> get extraSettings => [
         '当前:「${Pref.superResolutionType.label}」\n默认设置对番剧生效, 其他视频默认关闭\n超分辨率需要启用硬件解码, 若启用硬件解码后仍然不生效, 尝试切换硬件解码器为 auto-copy',
     onTap: _showSuperResolutionDialog,
   ),
+  if (Platform.isIOS)
+    NormalModel(
+      title: '补帧',
+      leading: const Icon(Icons.animation),
+      getSubtitle: () =>
+          '当前:「${Pref.frameInterpolationType.label}」\n将 24~30 帧视频补至 60 帧, 需 iOS 26 及以上\n效率: 最高按 720p 补帧; 画质: 最高按 1080p, 更耗电、更发热',
+      onTap: _showFrameInterpolationDialog,
+    ),
   const SwitchModel(
     title: '提前初始化播放器',
     subtitle: '相对减少手动播放加载时间',
@@ -979,6 +988,24 @@ void _visitor(Element context) {
     context.markNeedsBuild();
   } else {
     context.visitChildren(_visitor);
+  }
+}
+
+Future<void> _showFrameInterpolationDialog(
+  BuildContext context,
+  VoidCallback setState,
+) async {
+  final res = await showDialog<FrameInterpolationType>(
+    context: context,
+    builder: (context) => SelectDialog<FrameInterpolationType>(
+      title: '补帧',
+      value: Pref.frameInterpolationType,
+      values: FrameInterpolationType.values.map((e) => (e, e.label)).toList(),
+    ),
+  );
+  if (res != null) {
+    await GStorage.setting.put(SettingBoxKey.frameInterpolationType, res.index);
+    setState();
   }
 }
 

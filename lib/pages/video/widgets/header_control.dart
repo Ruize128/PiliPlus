@@ -16,6 +16,7 @@ import 'package:PiliPlus/http/init.dart';
 import 'package:PiliPlus/http/live.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/video.dart';
+import 'package:PiliPlus/models/common/frame_interpolation_type.dart';
 import 'package:PiliPlus/models/common/super_resolution_type.dart';
 import 'package:PiliPlus/models/common/video/audio_quality.dart';
 import 'package:PiliPlus/models/common/video/cdn_type.dart';
@@ -492,6 +493,26 @@ class HeaderControlState extends State<HeaderControl>
                   descPosType: .subtitle,
                   descStyle: subTitleStyle,
                 ),
+                if (Platform.isIOS)
+                  PopupListTile<FrameInterpolationType>(
+                    dense: true,
+                    leading: const Icon(Icons.animation, size: 20),
+                    title: const Text('补帧', style: titleStyle),
+                    titleStyle: theme.textTheme.bodyLarge,
+                    value: () {
+                      final value =
+                          plPlayerController.frameInterpolationType.value;
+                      return (value, value.label);
+                    },
+                    itemBuilder: (_) =>
+                        enumItemBuilder(FrameInterpolationType.values),
+                    onSelected: (value, setState) {
+                      plPlayerController.setFrameInterpolation(value);
+                      setState();
+                    },
+                    descPosType: .subtitle,
+                    descStyle: subTitleStyle,
+                  ),
                 if (PlatformUtils.isMobile)
                   if (plPlayerController.videoPlayerController
                       case final player?)

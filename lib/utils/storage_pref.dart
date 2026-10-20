@@ -9,6 +9,7 @@ import 'package:PiliPlus/models/common/dynamic/dynamic_badge_mode.dart';
 import 'package:PiliPlus/models/common/dynamic/dynamics_type.dart';
 import 'package:PiliPlus/models/common/dynamic/up_panel_position.dart';
 import 'package:PiliPlus/models/common/follow_order_type.dart';
+import 'package:PiliPlus/models/common/frame_interpolation_type.dart';
 import 'package:PiliPlus/models/common/member/tab_type.dart';
 import 'package:PiliPlus/models/common/mine_tab_type.dart';
 import 'package:PiliPlus/models/common/msg/msg_unread_type.dart';
@@ -479,6 +480,14 @@ abstract final class Pref {
       superResolutionType = SuperResolutionType.values.elementAtOrNull(index);
     }
     return superResolutionType ?? SuperResolutionType.disable;
+  }
+
+  static FrameInterpolationType get frameInterpolationType {
+    final index = _setting.get(SettingBoxKey.frameInterpolationType);
+    return (index is int
+            ? FrameInterpolationType.values.elementAtOrNull(index)
+            : null) ??
+        FrameInterpolationType.disable;
   }
 
   static bool get preInitPlayer =>

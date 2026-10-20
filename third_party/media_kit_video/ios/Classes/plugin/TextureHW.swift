@@ -14,6 +14,18 @@ public class TextureHW: NSObject, FlutterTexture, ResizableTextureProtocol {
     skipCheckArgs: true
   )
 
+  // Frame interpolation: the frame mpv rendered last, and the frame shown
+  // instead of mpv's own while the interpolator presents.
+  public private(set) var lastRendered: CVPixelBuffer?
+  private let presentedLock = NSLock()
+  private var presented: CVPixelBuffer?
+
+  public func present(_ buffer: CVPixelBuffer?) {
+    presentedLock.lock()
+    presented = buffer
+    presentedLock.unlock()
+  }
+
   init(
     handle: OpaquePointer,
     updateCallback: @escaping UpdateCallback
@@ -41,6 +53,13 @@ public class TextureHW: NSObject, FlutterTexture, ResizableTextureProtocol {
   }
 
   public func copyPixelBuffer() -> Unmanaged<CVPixelBuffer>? {
+    presentedLock.lock()
+    let presented = self.presented
+    presentedLock.unlock()
+    if let presented {
+      return Unmanaged.passRetained(presented)
+    }
+
     let textureContext = textureContexts.current
     if textureContext == nil {
       return nil
@@ -180,6 +199,7 @@ public class TextureHW: NSObject, FlutterTexture, ResizableTextureProtocol {
 
     glFlush()
 
+    lastRendered = textureContext!.pixelBuffer
     textureContexts.pushAsReady(textureContext!)
   }
 

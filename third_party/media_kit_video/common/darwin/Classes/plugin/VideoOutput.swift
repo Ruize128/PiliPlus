@@ -35,6 +35,11 @@ public class VideoOutput: NSObject {
   private var textureId: Int64 = -1
   private var currentSize: CGSize = CGSize.zero
   private var disposed: Bool = false
+  #if os(iOS)
+    // Frame interpolation (iOS 26+), see FrameInterpolator.
+    private var hardwareTexture: TextureHW?
+    private var frameInterpolator: AnyObject?
+  #endif
 
   init(
     handle: Int64,
@@ -61,6 +66,11 @@ public class VideoOutput: NSObject {
 
   deinit {
     worker.cancel()
+    #if os(iOS)
+      if #available(iOS 26.0, *) {
+        (frameInterpolator as? FrameInterpolator)?.stop()
+      }
+    #endif
 
     disposed = true
     disposeTextureId()
@@ -88,18 +98,20 @@ public class VideoOutput: NSObject {
     }
 
     if enableHardwareAcceleration {
-      texture = SafeResizableTexture(
-        TextureHW(
-          handle: handle,
-          // Use `weak self` to prevent memory leaks
-          updateCallback: { [weak self]() in
-            guard let that = self else {
-              return
-            }
-            that.updateCallback()
+      let hardwareTexture = TextureHW(
+        handle: handle,
+        // Use `weak self` to prevent memory leaks
+        updateCallback: { [weak self]() in
+          guard let that = self else {
+            return
           }
-        )
+          that.updateCallback()
+        }
       )
+      #if os(iOS)
+        self.hardwareTexture = hardwareTexture
+      #endif
+      texture = SafeResizableTexture(hardwareTexture)
     } else {
       texture = SafeResizableTexture(
         TextureSW(
@@ -170,12 +182,39 @@ public class VideoOutput: NSObject {
     }
 
     texture.render(size)
+    #if os(iOS)
+      if takenOverByInterpolator() {
+        return
+      }
+    #endif
     DispatchQueue.main.sync { [weak self] in
       guard let that = self else { return }
       // Textures must be marked as available from the main thread
       that.registry.textureFrameAvailable(that.textureId)
     }
   }
+
+  #if os(iOS)
+    /// The interpolator presents this frame itself (with an interpolated one
+    /// before it) when it is on.
+    private func takenOverByInterpolator() -> Bool {
+      guard #available(iOS 26.0, *), let hardwareTexture,
+        let frame = hardwareTexture.lastRendered
+      else {
+        return false
+      }
+      let interpolator =
+        frameInterpolator as? FrameInterpolator
+        ?? FrameInterpolator(
+          handle: handle,
+          texture: hardwareTexture,
+          registry: registry,
+          textureId: { [weak self] in self?.textureId ?? -1 }
+        )
+      frameInterpolator = interpolator
+      return interpolator.takeOver(frame)
+    }
+  #endif
 
     private var videoSize: CGSize {
         // fixed size

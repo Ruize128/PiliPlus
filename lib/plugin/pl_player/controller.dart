@@ -11,6 +11,7 @@ import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/video.dart';
 import 'package:PiliPlus/models/common/account_type.dart';
 import 'package:PiliPlus/models/common/audio_normalization.dart';
+import 'package:PiliPlus/models/common/frame_interpolation_type.dart';
 import 'package:PiliPlus/models/common/super_resolution_type.dart';
 import 'package:PiliPlus/models/common/video/video_type.dart';
 import 'package:PiliPlus/models/user/danmaku_rule.dart';
@@ -836,6 +837,47 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     }
   }
 
+  /// 补帧, iOS 26+ only: the video output reads the mpv property, see
+  /// third_party/media_kit_video/ios/Classes/plugin/FrameInterpolator.swift.
+  late final Rx<FrameInterpolationType> frameInterpolationType =
+      (Platform.isIOS
+              ? Pref.frameInterpolationType
+              : FrameInterpolationType.disable)
+          .obs;
+
+  void setFrameInterpolation(FrameInterpolationType type) {
+    frameInterpolationType.value = type;
+    if (!tempPlayerConf) {
+      setting.put(SettingBoxKey.frameInterpolationType, type.index);
+    }
+    if (_videoPlayerController case final player?) {
+      _applyFrameInterpolation(player);
+      if (type != .disable) _warnIfFrameInterpolationUnsupported(player);
+    }
+  }
+
+  void _applyFrameInterpolation(NativePlayer player) {
+    if (!Platform.isIOS) return;
+    final type = frameInterpolationType.value;
+    player
+      ..setProperty('user-data/frame-interpolation', type.mpvValue)
+      // Interpolated playback shows each frame about one refresh later.
+      ..setProperty('audio-delay', type == .disable ? '0' : '0.03');
+  }
+
+  void _warnIfFrameInterpolationUnsupported(NativePlayer player) {
+    Timer(const Duration(seconds: 4), () {
+      if (!identical(_videoPlayerController, player)) return;
+      // user-data reads back as JSON, so a string comes with quotes.
+      final status = player
+          .getProperty('user-data/frame-interpolation-status')
+          .replaceAll('"', '');
+      if (status == 'unsupported') {
+        SmartDialog.showToast('当前设备或视频不支持补帧，需 iOS 26 及以上');
+      }
+    });
+  }
+
   Future<Player> _initPlayer() async {
     assert(_videoPlayerController == null);
     final opt = {
@@ -874,6 +916,10 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     }
 
     player.setMediaHeader(userAgent: BrowserUa.pc, referer: HttpString.baseUrl);
+
+    if (frameInterpolationType.value != .disable) {
+      _applyFrameInterpolation(player);
+    }
 
     _startListeners(player);
 
