@@ -216,11 +216,9 @@ dependency_overrides:
       url: https://github.com/My-Responsitories/media-kit.git
       path: media_kit_native_event_loop
       ref: native
+  # Vendored from bggRGjQaUbCoE/media-kit@fd8421d (native), see third_party/media_kit_video/VENDORED.md.
   media_kit_video:
-    git:
-      url: https://github.com/bggRGjQaUbCoE/media-kit.git
-      path: media_kit_video
-      ref: native
+    path: third_party/media_kit_video
 
 dev_dependencies:
   flutter_test:

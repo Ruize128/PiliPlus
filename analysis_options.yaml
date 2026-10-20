@@ -20,6 +20,7 @@ analyzer:
     - windows/**
     - web/**
     - build/**
+    - third_party/**
     # - lib/common/widgets/flutter/**
 
 formatter:
