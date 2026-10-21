@@ -58,6 +58,17 @@ public class VideoOutputManager {
         }
     }
 
+    /** @return whether the change takes a new surface, see {@link VideoOutput#setFrameInterpolation}. */
+    public boolean setFrameInterpolation(long handle, int maxHeight, int multiplier) {
+        synchronized (lock) {
+            Log.i("media_kit", String.format(Locale.ENGLISH, "com.alexmercerind.media_kit_video.VideoOutputManager.setFrameInterpolation: %d %d %dx", handle, maxHeight, multiplier));
+            if (videoOutputs.containsKey(handle)) {
+                return Objects.requireNonNull(videoOutputs.get(handle)).setFrameInterpolation(maxHeight, multiplier);
+            }
+            return false;
+        }
+    }
+
     public void setSurfaceTextureSize(long handle, int width, int height) {
         synchronized (lock) {
             Log.i("media_kit", String.format(Locale.ENGLISH, "com.alexmercerind.media_kit_video.VideoOutputManager.setSurfaceTextureSize: %d %d %d", handle, width, height));

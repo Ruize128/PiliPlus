@@ -259,6 +259,34 @@ class AndroidVideoController extends PlatformVideoController {
     );
   }
 
+  /// Routes mpv through the native frame interpolator (FrameInterpolator.java).
+  /// Turning it on or off during playback re-creates the video output so it
+  /// applies at once; otherwise it applies from the next video.
+  @override
+  Future<bool> setFrameInterpolation(int maxHeight, {int multiplier = 2}) =>
+      _lock.synchronized(() async {
+        final data = await _channel
+            .invokeMethod<Map>('VideoOutputManager.SetFrameInterpolation', {
+              'handle': player.handle.toString(),
+              'maxHeight': maxHeight.toString(),
+              'multiplier': multiplier.toString(),
+            });
+        if (data?['recreateSurface'] == true &&
+            _wid != null &&
+            vo == 'gpu' &&
+            rect.value?.isEmpty == false) {
+          player.setOption('vo', 'null');
+          final surface = await _channel.invokeMethod(
+            'VideoOutputManager.CreateSurface',
+            {'handle': player.handle.toString()},
+          );
+          _wid = surface['wid'];
+          player.setOption('wid', _wid.toString());
+          player.setOption('vo', vo);
+        }
+        return data?['supported'] == true;
+      });
+
   /// Disposes the instance. Releases allocated resources back to the system.
   Future<void> _dispose() async {
     // Dispose the [StreamSubscription]s.

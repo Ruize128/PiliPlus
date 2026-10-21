@@ -46,6 +46,14 @@ abstract class PlatformVideoController {
   /// * “With great power comes great responsibility”
   Future<void>? setSize({int? width, int? height});
 
+  /// Frame interpolation (补帧) where the video output implements it:
+  /// [maxHeight] 720 or 1080, 0 for off; [multiplier] 2 or 4 output frames
+  /// per source frame. Completes with whether this device supports it.
+  Future<bool> setFrameInterpolation(
+    int maxHeight, {
+    int multiplier = 2,
+  }) async => false;
+
   /// A [Future] that completes when the first video frame has been rendered.
   Future<void> get waitUntilFirstFrameRendered =>
       waitUntilFirstFrameRenderedCompleter.future;

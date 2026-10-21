@@ -100,6 +100,7 @@ abstract final class SettingBoxKey {
       fallbackNormalization = 'fallbackNormalization',
       superResolutionType = 'superResolutionType',
       frameInterpolationType = 'frameInterpolationType',
+      frameInterpolationMultiplier = 'frameInterpolationMultiplier',
       preInitPlayer = 'preInitPlayer',
       mainTabBarView = 'mainTabBarView',
       searchSuggestion = 'searchSuggestion',

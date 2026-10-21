@@ -303,13 +303,22 @@ List<SettingsModel> get extraSettings => [
         '当前:「${Pref.superResolutionType.label}」\n默认设置对番剧生效, 其他视频默认关闭\n超分辨率需要启用硬件解码, 若启用硬件解码后仍然不生效, 尝试切换硬件解码器为 auto-copy',
     onTap: _showSuperResolutionDialog,
   ),
-  if (Platform.isIOS)
+  if (Platform.isIOS || Platform.isAndroid)
     NormalModel(
       title: '补帧',
       leading: const Icon(Icons.animation),
-      getSubtitle: () =>
-          '当前:「${Pref.frameInterpolationType.label}」\n将 24~30 帧视频补至 60 帧, 需 iOS 26 及以上\n效率: 最高按 720p 补帧; 画质: 最高按 1080p, 更耗电、更发热',
+      getSubtitle: () => Platform.isIOS
+          ? '当前:「${Pref.frameInterpolationType.label}」\n将 24~30 帧视频补至 60 帧, 需 iOS 26 及以上\n效率: 最高按 720p 补帧; 画质: 最高按 1080p, 更耗电、更发热'
+          : '当前:「${Pref.frameInterpolationType.label}」\n用 GPU 运动补偿将 24~30 帧视频补至 60 帧 (见补帧倍数)\n效率: 最高按 540p 估算运动; 画质: 按原分辨率, 更耗电、更发热',
       onTap: _showFrameInterpolationDialog,
+    ),
+  if (Platform.isAndroid)
+    NormalModel(
+      title: '补帧倍数',
+      leading: const Icon(Icons.speed),
+      getSubtitle: () =>
+          '当前:「${Pref.frameInterpolationMultiplier.label}」\n2x: 30 帧补至 60 帧; 4x: 补至 120 帧, 需 120Hz 屏幕, 补帧时会请求最高刷新率, 更耗电',
+      onTap: _showFrameInterpolationMultiplierDialog,
     ),
   const SwitchModel(
     title: '提前初始化播放器',
@@ -1005,6 +1014,29 @@ Future<void> _showFrameInterpolationDialog(
   );
   if (res != null) {
     await GStorage.setting.put(SettingBoxKey.frameInterpolationType, res.index);
+    setState();
+  }
+}
+
+Future<void> _showFrameInterpolationMultiplierDialog(
+  BuildContext context,
+  VoidCallback setState,
+) async {
+  final res = await showDialog<FrameInterpolationMultiplier>(
+    context: context,
+    builder: (context) => SelectDialog<FrameInterpolationMultiplier>(
+      title: '补帧倍数',
+      value: Pref.frameInterpolationMultiplier,
+      values: FrameInterpolationMultiplier.values
+          .map((e) => (e, e.label))
+          .toList(),
+    ),
+  );
+  if (res != null) {
+    await GStorage.setting.put(
+      SettingBoxKey.frameInterpolationMultiplier,
+      res.index,
+    );
     setState();
   }
 }

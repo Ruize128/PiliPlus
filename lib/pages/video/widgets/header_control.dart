@@ -493,7 +493,7 @@ class HeaderControlState extends State<HeaderControl>
                   descPosType: .subtitle,
                   descStyle: subTitleStyle,
                 ),
-                if (Platform.isIOS)
+                if (Platform.isIOS || Platform.isAndroid)
                   PopupListTile<FrameInterpolationType>(
                     dense: true,
                     leading: const Icon(Icons.animation, size: 20),
@@ -508,6 +508,26 @@ class HeaderControlState extends State<HeaderControl>
                         enumItemBuilder(FrameInterpolationType.values),
                     onSelected: (value, setState) {
                       plPlayerController.setFrameInterpolation(value);
+                      setState();
+                    },
+                    descPosType: .subtitle,
+                    descStyle: subTitleStyle,
+                  ),
+                if (Platform.isAndroid)
+                  PopupListTile<FrameInterpolationMultiplier>(
+                    dense: true,
+                    leading: const Icon(Icons.speed, size: 20),
+                    title: const Text('补帧倍数', style: titleStyle),
+                    titleStyle: theme.textTheme.bodyLarge,
+                    value: () {
+                      final value =
+                          plPlayerController.frameInterpolationMultiplier.value;
+                      return (value, value.label);
+                    },
+                    itemBuilder: (_) =>
+                        enumItemBuilder(FrameInterpolationMultiplier.values),
+                    onSelected: (value, setState) {
+                      plPlayerController.setFrameInterpolationMultiplier(value);
                       setState();
                     },
                     descPosType: .subtitle,

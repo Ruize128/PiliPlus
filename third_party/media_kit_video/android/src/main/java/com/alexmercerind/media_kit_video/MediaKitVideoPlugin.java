@@ -135,6 +135,21 @@ public class MediaKitVideoPlugin implements FlutterPlugin, MethodCallHandler, Ac
                     result.success(null);
                     break;
                 }
+                case "VideoOutputManager.SetFrameInterpolation": {
+                    final String handle = call.argument("handle");
+                    final String maxHeight = call.argument("maxHeight");
+                    final String multiplier = call.argument("multiplier");
+                    final int height = Integer.parseInt(Objects.requireNonNull(maxHeight));
+                    final HashMap<String, Boolean> data = new HashMap<>();
+                    data.put("supported", height == 0 || FrameInterpolator.isSupported());
+                    data.put("recreateSurface", handle != null && videoOutputManager.setFrameInterpolation(
+                            Long.parseLong(handle),
+                            height,
+                            Integer.parseInt(Objects.requireNonNull(multiplier))
+                    ));
+                    result.success(data);
+                    break;
+                }
                 case "VideoOutputManager.Dispose": {
                     final String handle = call.argument("handle");
                     if (handle != null) {

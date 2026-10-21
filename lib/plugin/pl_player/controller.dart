@@ -53,10 +53,12 @@ import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:archive/archive.dart' show getCrc32;
 import 'package:canvas_danmaku/canvas_danmaku.dart';
+import 'package:collection/collection.dart' show IterableExtension;
 import 'package:easy_debounce/easy_throttle.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/services.dart'
     show DeviceOrientation, HapticFeedback, KeyDownEvent;
+import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:flutter_volume_controller/flutter_volume_controller.dart';
 import 'package:get/get.dart';
@@ -837,10 +839,11 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     }
   }
 
-  /// 补帧, iOS 26+ only: the video output reads the mpv property, see
-  /// third_party/media_kit_video/ios/Classes/plugin/FrameInterpolator.swift.
+  /// 补帧, done by the video output: on iOS 26+ it reads an mpv property (see
+  /// third_party/media_kit_video/ios/Classes/plugin/FrameInterpolator.swift),
+  /// on Android it is set through the [VideoController] (FrameInterpolator.java).
   late final Rx<FrameInterpolationType> frameInterpolationType =
-      (Platform.isIOS
+      (Platform.isIOS || Platform.isAndroid
               ? Pref.frameInterpolationType
               : FrameInterpolationType.disable)
           .obs;
@@ -852,17 +855,83 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     }
     if (_videoPlayerController case final player?) {
       _applyFrameInterpolation(player);
-      if (type != .disable) _warnIfFrameInterpolationUnsupported(player);
+      if (Platform.isIOS && type != .disable) {
+        _warnIfFrameInterpolationUnsupported(player);
+      }
     }
   }
 
+  /// 补帧倍数, Android only.
+  late final Rx<FrameInterpolationMultiplier> frameInterpolationMultiplier =
+      Pref.frameInterpolationMultiplier.obs;
+
+  void setFrameInterpolationMultiplier(FrameInterpolationMultiplier value) {
+    frameInterpolationMultiplier.value = value;
+    if (!tempPlayerConf) {
+      setting.put(SettingBoxKey.frameInterpolationMultiplier, value.index);
+    }
+    if (_videoPlayerController case final player?
+        when frameInterpolationType.value != .disable) {
+      _applyFrameInterpolation(player);
+    }
+  }
+
+  /// Raised to the highest refresh rate for 4x frame interpolation (Android).
+  bool _raisedRefreshRate = false;
+
+  void _applyRefreshRate(bool high) {
+    if (high == _raisedRefreshRate) return;
+    _raisedRefreshRate = high;
+    if (high) {
+      FlutterDisplayMode.setHighRefreshRate();
+      return;
+    }
+    // Back to the 屏幕帧率 setting.
+    FlutterDisplayMode.supported.then((modes) {
+      final String? stored = setting.get(SettingBoxKey.displayMode);
+      FlutterDisplayMode.setPreferredMode(
+        modes.firstWhereOrNull((e) => e.toString() == stored) ??
+            DisplayMode.auto,
+      );
+    });
+  }
+
   void _applyFrameInterpolation(NativePlayer player) {
-    if (!Platform.isIOS) return;
+    if (!Platform.isIOS && !Platform.isAndroid) return;
     final type = frameInterpolationType.value;
-    player
-      ..setProperty('user-data/frame-interpolation', type.mpvValue)
-      // Interpolated playback shows each frame about one refresh later.
-      ..setProperty('audio-delay', type == .disable ? '0' : '0.03');
+    final enabled = type != .disable;
+    final multiplier = Platform.isAndroid
+        ? frameInterpolationMultiplier.value.value
+        : 2;
+    if (Platform.isIOS) {
+      player.setProperty('user-data/frame-interpolation', type.mpvValue);
+    } else {
+      // Each source frame must reach the interpolator once, which
+      // display-resample's repeated frames would hide.
+      player.setProperty('video-sync', enabled ? 'audio' : Pref.videoSync);
+      _videoController
+          ?.setFrameInterpolation(
+            int.parse(type.mpvValue),
+            multiplier: multiplier,
+          )
+          .then((supported) {
+            if (enabled && !supported) {
+              SmartDialog.showToast('当前设备不支持补帧，需 OpenGL ES 3.0');
+            }
+          });
+      // 4x only shows at 120 Hz, which HyperOS and others drop to for video.
+      _applyRefreshRate(enabled && multiplier >= 4);
+    }
+    // Interpolated playback shows each real frame about one refresh later;
+    // with 4x, a quarter frame more.
+    player.setProperty(
+      'audio-delay',
+      !enabled
+          ? '0'
+          : multiplier >= 4
+          ? '0.04'
+          : '0.03',
+    );
   }
 
   void _warnIfFrameInterpolationUnsupported(NativePlayer player) {
@@ -1750,6 +1819,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     _videoPlayerController?.dispose();
     _videoPlayerController = null;
     _videoController = null;
+    _applyRefreshRate(false);
     _instance = null;
     videoPlayerServiceHandler?.clear();
   }

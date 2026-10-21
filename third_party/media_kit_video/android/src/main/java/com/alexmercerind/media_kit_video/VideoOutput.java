@@ -50,6 +50,14 @@ public class VideoOutput {
 
     private final Object lock = new Object();
 
+    // Frame interpolation (补帧): mpv renders into the interpolator, which draws
+    // into Flutter's surface. maxHeight 0 = off.
+    private FrameInterpolator frameInterpolator;
+    private int frameInterpolationMaxHeight = 0;
+    private int frameInterpolationMultiplier = 2;
+    private int surfaceWidth = 0;
+    private int surfaceHeight = 0;
+
     VideoOutput(long handle, MethodChannel channelReference, TextureRegistry textureRegistryReference) {
         this.handle = handle;
         this.channelReference = channelReference;
@@ -147,6 +155,7 @@ public class VideoOutput {
     }
 
     public void dispose() {
+        releaseFrameInterpolator();
         try {
             surfaceTextureEntry.release();
         } catch (Throwable e) {
@@ -176,6 +185,8 @@ public class VideoOutput {
     public long createSurface() {
         synchronized (lock) {
             // Delete previous android.view.Surface & object reference.
+            // The interpolator lets go of Flutter's surface first.
+            releaseFrameInterpolator();
             try {
                 if (surface != null) {
                     clearSurface();
@@ -192,11 +203,51 @@ public class VideoOutput {
             // Create new android.view.Surface & object reference.
             try {
                 surface = new Surface(surfaceTextureEntry.surfaceTexture());
-                wid = (long) newGlobalObjectRef.invoke(null, surface);
+                Surface target = surface;
+                if (frameInterpolationMaxHeight > 0 && FrameInterpolator.isSupported()) {
+                    try {
+                        frameInterpolator = new FrameInterpolator(surface, frameInterpolationMaxHeight, frameInterpolationMultiplier, surfaceWidth, surfaceHeight);
+                        target = frameInterpolator.inputSurface();
+                    } catch (Throwable e) {
+                        // No OpenGL ES 3.0 context or a shader failed: render directly.
+                        Log.w("frameinterp", "unavailable: " + e);
+                        frameInterpolator = null;
+                    }
+                }
+                wid = (long) newGlobalObjectRef.invoke(null, target);
             } catch (Throwable e) {
                 e.printStackTrace();
             }
             return wid;
+        }
+    }
+
+    /**
+     * maxHeight 720/1080, 0 = off; multiplier 2 or 4. A running interpolator
+     * takes new values at once; turning it on or off applies to the next
+     * {@link #createSurface()}.
+     *
+     * @return whether it has to be turned on or off, i.e. takes a new surface.
+     */
+    public boolean setFrameInterpolation(int maxHeight, int multiplier) {
+        synchronized (lock) {
+            frameInterpolationMaxHeight = maxHeight;
+            frameInterpolationMultiplier = multiplier;
+            if (frameInterpolator != null && maxHeight > 0) {
+                frameInterpolator.setMaxHeight(maxHeight);
+                frameInterpolator.setMultiplier(multiplier);
+            }
+            final boolean wanted = maxHeight > 0 && FrameInterpolator.isSupported();
+            return wanted != (frameInterpolator != null);
+        }
+    }
+
+    private void releaseFrameInterpolator() {
+        synchronized (lock) {
+            if (frameInterpolator != null) {
+                frameInterpolator.release();
+                frameInterpolator = null;
+            }
         }
     }
 
@@ -205,6 +256,11 @@ public class VideoOutput {
             surfaceTextureEntry.surfaceTexture().setDefaultBufferSize(width, height);
         } catch (Throwable e) {
             e.printStackTrace();
+        }
+        synchronized (lock) {
+            surfaceWidth = width;
+            surfaceHeight = height;
+            if (frameInterpolator != null) frameInterpolator.setSize(width, height);
         }
     }
 

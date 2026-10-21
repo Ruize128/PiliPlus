@@ -12,5 +12,11 @@ Local changes:
   `VTLowLatencyFrameInterpolation`: `ios/Classes/plugin/FrameInterpolator.swift`,
   hooks in `ios/Classes/plugin/TextureHW.swift` and
   `common/darwin/Classes/plugin/VideoOutput.swift`.
+- Android frame interpolation (2x or 4x) with GPU motion compensation in
+  OpenGL ES 3.0: `android/src/main/java/com/alexmercerind/media_kit_video/FrameInterpolator.java`,
+  hooks in `VideoOutput.java`, `VideoOutputManager.java` and
+  `MediaKitVideoPlugin.java` (`VideoOutputManager.SetFrameInterpolation`), and
+  `setFrameInterpolation` in `lib/src/video_controller/platform_video_controller.dart`
+  and `android_video_controller/real.dart`.
 
 To update, copy a newer revision over this folder and reapply the changes above.

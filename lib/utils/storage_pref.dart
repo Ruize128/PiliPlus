@@ -490,6 +490,14 @@ abstract final class Pref {
         FrameInterpolationType.disable;
   }
 
+  static FrameInterpolationMultiplier get frameInterpolationMultiplier {
+    final index = _setting.get(SettingBoxKey.frameInterpolationMultiplier);
+    return (index is int
+            ? FrameInterpolationMultiplier.values.elementAtOrNull(index)
+            : null) ??
+        FrameInterpolationMultiplier.x2;
+  }
+
   static bool get preInitPlayer =>
       _setting.get(SettingBoxKey.preInitPlayer, defaultValue: false);
 
